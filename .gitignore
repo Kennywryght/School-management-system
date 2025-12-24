@@ -1,0 +1,60 @@
+git init
+```
+
+Now create `.gitignore` file with this content:
+```
+# Python
+venv/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+*.so
+*.egg
+*.egg-info/
+dist/
+build/
+
+# Environment variables
+.env
+
+# IDEs
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Database
+*.db
+*.sqlite3
+
+# OS
+.DS_Store
+Thumbs.db
+```
+
+---
+
+### **8. Your folder structure should now look like this:**
+```
+school_management_system/
+├── app/
+│   ├── __init__.py
+│   ├── main.py
+│   ├── database.py
+│   ├── models.py
+│   ├── schemas.py
+│   ├── auth.py
+│   └── routers/
+│       ├── __init__.py
+│       ├── admin.py
+│       ├── teachers.py
+│       ├── students.py
+│       └── results.py
+├── frontend/               (empty for now)
+├── venv/                   (your virtual environment)
+├── requirements.txt
+├── .env
+├── .gitignore
+└── README.md
