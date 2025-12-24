@@ -1,3 +1,13 @@
+import os
+
+# ... rest of imports ...
+
+# For production deployment
+if os.getenv("RENDER"):
+    DATABASE_URL = os.getenv("DATABASE_URL")
+    if DATABASE_URL and DATABASE_URL.startswith("postgres://"):
+        DATABASE_URL = DATABASE_URL.replace("postgres://", "postgresql://", 1)
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from app.routers import auth, admin, teachers, students
