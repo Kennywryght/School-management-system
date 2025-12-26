@@ -1,8 +1,6 @@
 import axios from 'axios';
-
-const API_URL = import.meta.env.PROD 
-  ? 'https://school-management-system-2-wck6.onrender.com'  // Production URL
-  : '/api';  // Development URL
+const API_URL = 'https://school-management-system-2-wck6.onrender.com';
+//const API_URL = '/api';
 
 // Create axios instance
 const api = axios.create({
