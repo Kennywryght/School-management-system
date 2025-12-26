@@ -1,5 +1,5 @@
 import axios from 'axios';
-const API_URL = 'https://school-management-system-2-wck6.onrender.com';
+const API_URL = 'https://school-management-system-2-wck6.onrender.com/api';
 //const API_URL = '/api';
 
 // Create axios instance
