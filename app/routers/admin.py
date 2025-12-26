@@ -3,10 +3,34 @@ from sqlalchemy.orm import Session
 from typing import List, Optional
 from app.database import get_db
 from app.models import User, Class, Subject, Term, Teacher, Student, TeacherAssignment
-from app.auth import get_current_user, require_role, get_password_hash
+from app.auth import get_current_user, get_password_hash
 from app.schemas import UserResponse, ClassCreate, ClassUpdate, ClassResponse, SubjectCreate ,SubjectUpdate,SubjectResponse, TermCreate, TermUpdate, TermResponse, TeacherCreate, TeacherUpdate, TeacherResponse, StudentCreate, StudentUpdate, StudentResponse, TeacherAssignmentCreate, TeacherAssignmentResponse
 
 router = APIRouter(prefix="/api/admin", tags=["Admin"])
+
+
+# ============= AUTH HELPER FUNCTIONS =============
+
+def require_role(required_role: str):
+    """Dependency to check if user has required role."""
+    def role_checker(current_user: User = Depends(get_current_user)):
+        if current_user.role != required_role:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail=f"Requires {required_role} role. Current role: {current_user.role}"
+            )
+        return current_user
+    return role_checker
+
+
+def require_admin(current_user: User = Depends(get_current_user)):
+    """Dependency to check if user is admin."""
+    if current_user.role != "admin":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Requires admin role"
+        )
+    return current_user
 
 
 # ============= DASHBOARD =============
