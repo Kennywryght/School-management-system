@@ -101,3 +101,26 @@ async def get_current_user(token: str = Depends(oauth2_scheme), db: Session = De
 async def get_current_active_user(current_user: User = Depends(get_current_user)):
     """Check if the current user is active."""
     return current_user
+
+# Add these functions to your existing auth.py
+
+def require_role(required_role: str):
+    """Dependency to check if user has required role."""
+    def role_checker(current_user: User = Depends(get_current_user)):
+        if current_user.role != required_role:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail=f"Requires {required_role} role. Current role: {current_user.role}"
+            )
+        return current_user
+    return role_checker
+
+
+def require_admin(current_user: User = Depends(get_current_user)):
+    """Dependency to check if user is admin."""
+    if current_user.role != "admin":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Requires admin role"
+        )
+    return current_user
