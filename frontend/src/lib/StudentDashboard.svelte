@@ -99,9 +99,9 @@
         </div>
         
         <!-- Results Table -->
-        <div class="card">
+        <div class="overflow-x: auto;">
           <h2>Your Results - {summary.term_name}</h2>
-          <table style="margin-top: 20px;">
+          <table style="min-width: 600px;">
             <thead>
               <tr>
                 <th>Subject</th>

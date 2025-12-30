@@ -115,4 +115,24 @@
     width: 100%;
     margin: 20px;
   }
+  /* Add to existing style */
+
+@media (max-width: 768px) {
+  .login-card {
+    margin: 10px;
+    padding: 20px;
+  }
+  
+  .login-container {
+    padding: 20px;
+  }
+  
+  h1 {
+    font-size: 1.8rem !important;
+  }
+  
+  h2 {
+    font-size: 1.3rem !important;
+  }
+}
 </style>

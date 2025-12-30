@@ -125,11 +125,11 @@
     </div>
   {:else}
     <form on:submit|preventDefault={handleSubmit}>
-      <div class="card">
+      <div class="overflow-x: auto;">
         <h3>Enter Marks for Students</h3>
         <p style="color: #666; margin-bottom: 20px;">Enter marks between 0 and 100. Leave blank to skip.</p>
         
-        <table>
+        <table style="min-width: 600px;">
           <thead>
             <tr>
               <th>Admission #</th>

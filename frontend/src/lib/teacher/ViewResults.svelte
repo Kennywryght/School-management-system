@@ -81,8 +81,8 @@
       <p>You haven't uploaded any results yet.</p>
     </div>
   {:else}
-    <div class="card">
-      <table>
+    <div class="overflow-x: auto;">
+      <table style="min-width: 600px;">
         <thead>
           <tr>
             <th>Student</th>

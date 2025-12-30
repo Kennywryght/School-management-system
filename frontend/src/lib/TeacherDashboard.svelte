@@ -223,4 +223,22 @@
     background: #4CAF50;
     font-weight: bold;
   }
+  /* Add to existing <style> section */
+
+/* Mobile sidebar */
+@media (max-width: 768px) {
+  .sidebar {
+    width: 100%;
+    min-height: auto;
+    display: flex;
+    overflow-x: auto;
+    padding: 10px 0;
+  }
+  
+  .sidebar-btn {
+    padding: 10px 15px;
+    white-space: nowrap;
+    font-size: 14px;
+  }
+}
 </style>
