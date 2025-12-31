@@ -3,11 +3,7 @@ import { svelte } from '@sveltejs/vite-plugin-svelte'
 
 export default defineConfig({
   plugins: [svelte()],
-  server: {
-    port: 3000
-  },
   build: {
-    outDir: 'dist',
-    sourcemap: false
+    outDir: 'dist'
   }
 })
