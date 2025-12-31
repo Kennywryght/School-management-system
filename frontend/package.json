@@ -8,15 +8,10 @@
     "preview": "vite preview"
   },
   "dependencies": {
-    "svelte": "4.2.19",
-    "acorn": "8.11.0",
-    "@jridgewell/trace-mapping": "0.3.25",
-    "@jridgewell/resolve-uri": "3.1.2",
-    "@jridgewell/sourcemap-codec": "1.4.15",
-    "@ampproject/remapping": "2.2.1"
+    "svelte": "^4.2.19"
   },
   "devDependencies": {
-    "@sveltejs/vite-plugin-svelte": "2.5.3",
-    "vite": "3.2.5"
+    "@sveltejs/vite-plugin-svelte": "^2.5.3",
+    "vite": "^7.3.0"
   }
 }

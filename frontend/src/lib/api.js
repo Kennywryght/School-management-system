@@ -1,48 +1,115 @@
-import axios from 'axios';
 const API_URL = 'https://school-management-system-2-wck6.onrender.com/api';
 //const API_URL = '/api';
 
-// Create axios instance
-const api = axios.create({
-  baseURL: API_URL,
-  headers: {
-    'Content-Type': 'application/json',
-  },
-});
-
-// Add token to requests if it exists
-api.interceptors.request.use((config) => {
-  const token = localStorage.getItem('token');
-  if (token) {
-    config.headers.Authorization = `Bearer ${token}`;
+// Helper function to handle responses
+async function handleResponse(response) {
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({ 
+      detail: `HTTP error! status: ${response.status}` 
+    }));
+    const err = new Error(error.detail || error.message || 'Request failed');
+    err.response = {
+      status: response.status,
+      data: error
+    };
+    throw err;
   }
-  return config;
-});
+  return response.json();
+}
+
+// Helper function to get auth headers
+function getAuthHeaders(token = null) {
+  const headers = {
+    'Content-Type': 'application/json',
+  };
+  
+  const authToken = token || localStorage.getItem('token');
+  if (authToken) {
+    headers.Authorization = `Bearer ${authToken}`;
+  }
+  
+  return headers;
+}
+
+// API object with common methods
+const api = {
+  get: async (endpoint, options = {}) => {
+    const response = await fetch(`${API_URL}${endpoint}`, {
+      method: 'GET',
+      headers: getAuthHeaders(options.token),
+      ...options
+    });
+    return { data: await handleResponse(response) };
+  },
+  
+  post: async (endpoint, data, options = {}) => {
+    const response = await fetch(`${API_URL}${endpoint}`, {
+      method: 'POST',
+      headers: getAuthHeaders(options.token),
+      body: JSON.stringify(data),
+      ...options
+    });
+    return { data: await handleResponse(response) };
+  },
+  
+  put: async (endpoint, data, options = {}) => {
+    const response = await fetch(`${API_URL}${endpoint}`, {
+      method: 'PUT',
+      headers: getAuthHeaders(options.token),
+      body: JSON.stringify(data),
+      ...options
+    });
+    return { data: await handleResponse(response) };
+  },
+  
+  delete: async (endpoint, options = {}) => {
+    const response = await fetch(`${API_URL}${endpoint}`, {
+      method: 'DELETE',
+      headers: getAuthHeaders(options.token),
+      ...options
+    });
+    return { data: await handleResponse(response) };
+  }
+};
 
 // Auth API calls
 export const authAPI = {
   login: async (email, password) => {
-    const formData = new FormData();
+    const formData = new URLSearchParams();
     formData.append('username', email);
     formData.append('password', password);
     
-    const response = await axios.post(`${API_URL}/auth/login`, formData, {
+    const response = await fetch(`${API_URL}/auth/login`, {
+      method: 'POST',
       headers: {
         'Content-Type': 'application/x-www-form-urlencoded',
       },
+      body: formData
     });
-    return response.data;
+    
+    return handleResponse(response);
   },
   
   getCurrentUser: async (token) => {
-    // Pass token directly if provided
-    const headers = {};
+    const headers = {
+      'Content-Type': 'application/json',
+    };
+    
     if (token) {
       headers.Authorization = `Bearer ${token}`;
+    } else {
+      const storedToken = localStorage.getItem('token');
+      if (storedToken) {
+        headers.Authorization = `Bearer ${storedToken}`;
+      }
     }
     
-    const response = await api.get('/auth/me', { headers });
-    return response.data;
+    const response = await fetch(`${API_URL}/auth/me`, {
+      method: 'GET',
+      headers
+    });
+    
+    return handleResponse(response);
   },
 };
 
