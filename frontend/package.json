@@ -10,6 +10,7 @@
   "dependencies": {
     "svelte": "4.2.0",
     "@sveltejs/vite-plugin-svelte": "2.5.3"
+    "acorn": "8.10.0" 
   },
   "devDependencies": {
     "vite": "4.5.14"
