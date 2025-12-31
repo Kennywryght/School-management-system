@@ -1,11 +1,11 @@
 {
   "name": "frontend",
+  "private": true,
   "version": "0.0.0",
   "type": "module",
   "scripts": {
     "dev": "vite",
     "build": "vite build",
-    "preinstall": "chmod +x node_modules/.bin/* || true",
     "preview": "vite preview"
     
   },
@@ -14,6 +14,12 @@
   },
   "devDependencies": {
     "@sveltejs/vite-plugin-svelte": "^3.0.0",
+    "@types/node": "^20.5.12",
+    "svelte":"5.46.1",
     "vite": "5.4.11"
+    
+  },
+  "engines": {
+    "node": ">=20.18.0",
   }
 }
