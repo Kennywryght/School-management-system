@@ -21,7 +21,12 @@
   };
   
   // Statistics
-  let teacherStats = {};
+  let teacherStats = {
+    totalTeachers: 0,
+    activeTeachers: 0,
+    teachersWithAssignments: [],
+    totalAssignments: 0
+  };
   
   // Filter
   let searchTerm = '';
@@ -48,16 +53,20 @@
         classesAPI.getAll()
       ]);
       
-      teachers = teachersData;
-      assignments = assignmentsData;
-      subjects = subjectsData;
-      classes = classesData;
+      teachers = teachersData || [];
+      assignments = assignmentsData || [];
+      subjects = subjectsData || [];
+      classes = classesData || [];
       
       // Calculate statistics
       calculateTeacherStats();
     } catch (err) {
       error = 'Failed to load data';
       console.error(err);
+      teachers = [];
+      assignments = [];
+      subjects = [];
+      classes = [];
     } finally {
       loading = false;
     }
@@ -67,11 +76,13 @@
     try {
       loading = true;
       error = '';
-      teachers = await teachersAPI.getAll();
+      const data = await teachersAPI.getAll();
+      teachers = data || [];
       calculateTeacherStats();
     } catch (err) {
       error = 'Failed to load teachers';
       console.error(err);
+      teachers = [];
     } finally {
       loading = false;
     }
@@ -79,24 +90,26 @@
   
   function calculateTeacherStats() {
     const stats = {
-      totalTeachers: teachers.length,
-      activeTeachers: teachers.length,
+      totalTeachers: teachers?.length || 0,
+      activeTeachers: teachers?.length || 0,
       teachersWithAssignments: [],
       totalAssignments: 0
     };
     
     // Calculate assignments per teacher
-    teachers.forEach(teacher => {
-      const teacherAssignments = assignments.filter(a => a.teacher_id === teacher.id);
-      if (teacherAssignments.length > 0) {
-        stats.teachersWithAssignments.push({
-          id: teacher.id,
-          name: `${teacher.first_name} ${teacher.last_name}`,
-          assignmentCount: teacherAssignments.length
-        });
-      }
-      stats.totalAssignments += teacherAssignments.length;
-    });
+    if (teachers && Array.isArray(teachers)) {
+      teachers.forEach(teacher => {
+        const teacherAssignments = assignments?.filter(a => a.teacher_id === teacher.id) || [];
+        if (teacherAssignments.length > 0) {
+          stats.teachersWithAssignments.push({
+            id: teacher.id,
+            name: `${teacher.first_name} ${teacher.last_name}`,
+            assignmentCount: teacherAssignments.length
+          });
+        }
+        stats.totalAssignments += teacherAssignments.length;
+      });
+    }
     
     teacherStats = stats;
   }
@@ -167,7 +180,7 @@
   
   async function handleDelete(id, name) {
     // Check if teacher has assignments
-    const hasAssignments = assignments.some(a => a.teacher_id === id);
+    const hasAssignments = assignments?.some(a => a.teacher_id === id) || false;
     
     if (hasAssignments) {
       error = `Cannot delete teacher "${name}" because they have assignments.`;
@@ -196,7 +209,7 @@
   // Open assignments modal for a teacher
   function openAssignmentsModal(teacher) {
     selectedTeacher = teacher;
-    teacherAssignments = assignments.filter(a => a.teacher_id === teacher.id);
+    teacherAssignments = assignments?.filter(a => a.teacher_id === teacher.id) || [];
     showAssignmentsModal = true;
   }
   
@@ -207,10 +220,11 @@
   }
   
   function getTeacherAssignmentCount(teacherId) {
-    return assignments.filter(a => a.teacher_id === teacherId).length;
+    return assignments?.filter(a => a.teacher_id === teacherId).length || 0;
   }
   
   function getFilteredTeachers() {
+    if (!teachers || !Array.isArray(teachers)) return [];
     if (!searchTerm.trim()) return teachers;
     
     const term = searchTerm.toLowerCase();
@@ -235,74 +249,120 @@
       closeAssignmentsModal();
     }
   }
+  
+  $: filteredTeachers = getFilteredTeachers();
 </script>
 
 <div class="page-container">
+  <!-- Header -->
+  <div class="page-header">
+    <div class="header-content">
+      <div class="header-title-section">
+        <h1 class="page-title">
+          <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
+            <circle cx="9" cy="7" r="4"/>
+            <path d="M23 21v-2a4 4 0 0 0-3-3.87"/>
+            <path d="M16 3.13a4 4 0 0 1 0 7.75"/>
+          </svg>
+          Manage Teachers
+        </h1>
+        <p class="page-subtitle">Add, edit, and manage your teaching staff</p>
+      </div>
+      <button class="btn-primary" on:click={openCreateForm}>
+        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <line x1="12" y1="5" x2="12" y2="19"/>
+          <line x1="5" y1="12" x2="19" y2="12"/>
+        </svg>
+        Add Teacher
+      </button>
+    </div>
+  </div>
+
   <div class="container">
-    <!-- Header -->
-    <div class="header">
-      <div class="header-left">
-        <h1>Manage Teachers</h1>
-        <div class="header-stats">
-          <div class="stat-card">
-            <div class="stat-number">{teacherStats.totalTeachers}</div>
-            <div class="stat-label">Total Teachers</div>
-          </div>
-          <div class="stat-card">
-            <div class="stat-number">{teacherStats.teachersWithAssignments.length}</div>
-            <div class="stat-label">With Assignments</div>
-          </div>
-          <div class="stat-card">
-            <div class="stat-number">{teacherStats.totalAssignments}</div>
-            <div class="stat-label">Total Assignments</div>
-          </div>
+    <!-- Stats Cards -->
+    <div class="stats-grid">
+      <div class="stat-card stat-primary">
+        <div class="stat-icon">
+          <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
+            <circle cx="9" cy="7" r="4"/>
+            <path d="M23 21v-2a4 4 0 0 0-3-3.87"/>
+            <path d="M16 3.13a4 4 0 0 1 0 7.75"/>
+          </svg>
+        </div>
+        <div class="stat-content">
+          <div class="stat-value">{teacherStats.totalTeachers}</div>
+          <div class="stat-label">Total Teachers</div>
         </div>
       </div>
-      <div class="header-actions">
-        <button class="btn btn-primary" on:click={openCreateForm}>
-          <span class="btn-icon">+</span>
-          <span class="btn-text">Add Teacher</span>
-        </button>
+
+      <div class="stat-card stat-success">
+        <div class="stat-icon">
+          <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <polyline points="20 6 9 17 4 12"/>
+          </svg>
+        </div>
+        <div class="stat-content">
+          <div class="stat-value">{teacherStats.teachersWithAssignments.length}</div>
+          <div class="stat-label">With Assignments</div>
+        </div>
+      </div>
+
+      <div class="stat-card stat-info">
+        <div class="stat-icon">
+          <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/>
+            <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/>
+          </svg>
+        </div>
+        <div class="stat-content">
+          <div class="stat-value">{teacherStats.totalAssignments}</div>
+          <div class="stat-label">Total Assignments</div>
+        </div>
       </div>
     </div>
     
     <!-- Alerts -->
     {#if success}
       <div class="alert alert-success">
-        <span class="alert-icon">✓</span>
-        <div class="alert-content">
-          <strong>Success!</strong> {success}
-        </div>
+        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <polyline points="20 6 9 17 4 12"/>
+        </svg>
+        <span>{success}</span>
       </div>
     {/if}
     
     {#if error}
       <div class="alert alert-error">
-        <span class="alert-icon">!</span>
-        <div class="alert-content">
-          <strong>Error!</strong> {error}
-        </div>
+        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="12" cy="12" r="10"/>
+          <line x1="12" y1="8" x2="12" y2="12"/>
+          <line x1="12" y1="16" x2="12.01" y2="16"/>
+        </svg>
+        <span>{error}</span>
       </div>
     {/if}
     
-    <!-- Search and Filter -->
-    <div class="card filter-card">
-      <div class="search-container">
-        <div class="search-icon">
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor">
-            <circle cx="11" cy="11" r="8" stroke-width="2"/>
-            <path d="M21 21l-4.35-4.35" stroke-width="2" stroke-linecap="round"/>
-          </svg>
-        </div>
+    <!-- Search Bar -->
+    <div class="search-card">
+      <div class="search-wrapper">
+        <svg class="search-icon" xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="11" cy="11" r="8"/>
+          <path d="m21 21-4.35-4.35"/>
+        </svg>
         <input
           type="text"
           bind:value={searchTerm}
-          placeholder="Search teachers by name, email, or phone..."
+          placeholder="Search by name, email, or phone..."
           class="search-input"
         />
         {#if searchTerm}
-          <button class="btn btn-clear-search" on:click={() => searchTerm = ''} aria-label="Clear search">
-            ×
+          <button class="clear-btn" on:click={() => searchTerm = ''}>
+            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <line x1="18" y1="6" x2="6" y2="18"/>
+              <line x1="6" y1="6" x2="18" y2="18"/>
+            </svg>
           </button>
         {/if}
       </div>
@@ -310,171 +370,134 @@
     
     <!-- Main Content -->
     {#if loading}
-      <div class="card text-center loading-container">
+      <div class="loading-card">
         <div class="spinner"></div>
         <p>Loading teachers...</p>
       </div>
       
-    <!-- Empty State -->
-    {:else if teachers.length === 0}
-      <div class="card text-center empty-state">
-        <div class="empty-icon">👨‍🏫</div>
-        <h3>No Teachers Found</h3>
-        <p>Create your first teacher to get started!</p>
-        <button class="btn btn-primary" on:click={openCreateForm}>
+    {:else if !teachers || teachers.length === 0}
+      <div class="empty-state">
+        <div class="empty-icon">
+          <svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
+            <circle cx="9" cy="7" r="4"/>
+            <path d="M23 21v-2a4 4 0 0 0-3-3.87"/>
+            <path d="M16 3.13a4 4 0 0 1 0 7.75"/>
+          </svg>
+        </div>
+        <h3>No Teachers Yet</h3>
+        <p>Get started by adding your first teacher to the system</p>
+        <button class="btn-primary" on:click={openCreateForm}>
+          <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <line x1="12" y1="5" x2="12" y2="19"/>
+            <line x1="5" y1="12" x2="19" y2="12"/>
+          </svg>
           Create First Teacher
         </button>
       </div>
       
-    <!-- Teachers List -->
     {:else}
-      <div class="card">
+      <div class="content-card">
         <div class="card-header">
-          <h3 class="card-title">
+          <h2 class="card-title">
             {#if searchTerm}
-              Search Results ({getFilteredTeachers().length})
+              Search Results ({filteredTeachers.length})
             {:else}
               All Teachers ({teachers.length})
             {/if}
-          </h3>
+          </h2>
         </div>
         
-        <!-- Mobile Card View -->
-        <div class="mobile-cards-view">
-          {#each getFilteredTeachers() as teacher (teacher.id)}
-            <div class="teacher-card">
-              <div class="teacher-card-header">
-                <div class="teacher-id">#{teacher.id}</div>
-                {#if getTeacherAssignmentCount(teacher.id) > 0}
-                  <div class="teacher-assignments">
-                    {getTeacherAssignmentCount(teacher.id)} assignment(s)
-                  </div>
-                {/if}
-              </div>
-              <div class="teacher-card-body">
-                <h3 class="teacher-name">{teacher.first_name} {teacher.last_name}</h3>
-                <div class="teacher-info">
-                  <div class="info-item">
-                    <span class="info-label">Email:</span>
-                    <span class="info-value">{teacher.email}</span>
-                  </div>
-                  <div class="info-item">
-                    <span class="info-label">Phone:</span>
-                    <span class="info-value">{teacher.phone || 'N/A'}</span>
-                  </div>
-                </div>
-                <div class="teacher-meta">
-                  <span class="meta-item">
-                    <span class="meta-icon">📅</span>
-                    Joined: {new Date(teacher.created_at).toLocaleDateString()}
-                  </span>
-                </div>
-              </div>
-              <div class="teacher-card-actions">
-                {#if getTeacherAssignmentCount(teacher.id) > 0}
-                  <button 
-                    class="btn btn-info btn-block" 
-                    on:click={() => openAssignmentsModal(teacher)}
-                  >
-                    View Assignments
-                  </button>
-                {/if}
-                <button 
-                  class="btn btn-secondary btn-block" 
-                  on:click={() => openEditForm(teacher)}
-                >
-                  Edit
-                </button>
-                <button 
-                  class="btn btn-danger btn-block" 
-                  on:click={() => handleDelete(teacher.id, `${teacher.first_name} ${teacher.last_name}`)}
-                  disabled={getTeacherAssignmentCount(teacher.id) > 0}
-                  class:disabled={getTeacherAssignmentCount(teacher.id) > 0}
-                >
-                  {getTeacherAssignmentCount(teacher.id) > 0 ? 'Has Assignments' : 'Delete'}
-                </button>
-              </div>
-            </div>
-          {/each}
-        </div>
-        
-        <!-- Desktop Table View -->
-        <div class="desktop-table-view">
-          <div class="table-container">
-            <table class="teachers-table">
-              <thead>
-                <tr>
-                  <th>ID</th>
-                  <th>Name</th>
-                  <th>Email</th>
-                  <th>Phone</th>
-                  <th>Assignments</th>
-                  <th>Joined</th>
-                  <th>Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                {#each getFilteredTeachers() as teacher (teacher.id)}
-                  <tr>
-                    <td>{teacher.id}</td>
-                    <td>
-                      <strong class="teacher-name-cell">{teacher.first_name} {teacher.last_name}</strong>
-                    </td>
-                    <td>{teacher.email}</td>
-                    <td>
-                      {#if teacher.phone}
-                        <span class="phone-badge">{teacher.phone}</span>
-                      {:else}
-                        <span class="text-muted">N/A</span>
-                      {/if}
-                    </td>
-                    <td>
-                      {#if getTeacherAssignmentCount(teacher.id) > 0}
-                        <button 
-                          class="btn btn-info btn-sm" 
-                          on:click={() => openAssignmentsModal(teacher)}
-                        >
-                          {getTeacherAssignmentCount(teacher.id)} assignment(s)
-                        </button>
-                      {:else}
-                        <span class="text-muted">None</span>
-                      {/if}
-                    </td>
-                    <td>
-                      {new Date(teacher.created_at).toLocaleDateString()}
-                    </td>
-                    <td>
-                      <div class="action-buttons">
-                        <button 
-                          class="btn btn-secondary btn-sm" 
-                          on:click={() => openEditForm(teacher)}
-                        >
-                          Edit
-                        </button>
-                        <button 
-                          class="btn btn-danger btn-sm" 
-                          on:click={() => handleDelete(teacher.id, `${teacher.first_name} ${teacher.last_name}`)}
-                          disabled={getTeacherAssignmentCount(teacher.id) > 0}
-                          class:disabled={getTeacherAssignmentCount(teacher.id) > 0}
-                        >
-                          {getTeacherAssignmentCount(teacher.id) > 0 ? 'Has Assignments' : 'Delete'}
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                {/each}
-              </tbody>
-            </table>
-          </div>
-        </div>
-        
-        <!-- Empty Search Results -->
-        {#if searchTerm && getFilteredTeachers().length === 0}
-          <div class="empty-search-results">
+        {#if filteredTeachers.length === 0}
+          <div class="no-results">
+            <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <circle cx="11" cy="11" r="8"/>
+              <path d="m21 21-4.35-4.35"/>
+            </svg>
             <p>No teachers found for "<strong>{searchTerm}</strong>"</p>
-            <button class="btn btn-secondary btn-sm" on:click={() => searchTerm = ''}>
-              Clear Search
-            </button>
+            <button class="btn-secondary" on:click={() => searchTerm = ''}>Clear Search</button>
+          </div>
+        {:else}
+          <!-- Teachers Grid -->
+          <div class="teachers-grid">
+            {#each filteredTeachers as teacher (teacher.id)}
+              <div class="teacher-card">
+                <div class="teacher-avatar">
+                  <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>
+                    <circle cx="12" cy="7" r="4"/>
+                  </svg>
+                </div>
+                <div class="teacher-info">
+                  <h3 class="teacher-name">{teacher.first_name} {teacher.last_name}</h3>
+                  <div class="teacher-details">
+                    <div class="detail-row">
+                      <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <rect x="2" y="4" width="20" height="16" rx="2"/>
+                        <path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7"/>
+                      </svg>
+                      <span>{teacher.email}</span>
+                    </div>
+                    {#if teacher.phone}
+                      <div class="detail-row">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                          <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/>
+                        </svg>
+                        <span>{teacher.phone}</span>
+                      </div>
+                    {/if}
+                    <div class="detail-row">
+                      <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <rect x="3" y="4" width="18" height="18" rx="2" ry="2"/>
+                        <line x1="16" y1="2" x2="16" y2="6"/>
+                        <line x1="8" y1="2" x2="8" y2="6"/>
+                        <line x1="3" y1="10" x2="21" y2="10"/>
+                      </svg>
+                      <span>Joined {new Date(teacher.created_at).toLocaleDateString()}</span>
+                    </div>
+                  </div>
+                  
+                  {#if getTeacherAssignmentCount(teacher.id) > 0}
+                    <div class="assignments-badge">
+                      <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/>
+                        <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/>
+                      </svg>
+                      {getTeacherAssignmentCount(teacher.id)} Assignment{getTeacherAssignmentCount(teacher.id) > 1 ? 's' : ''}
+                    </div>
+                  {/if}
+                </div>
+                
+                <div class="teacher-actions">
+                  {#if getTeacherAssignmentCount(teacher.id) > 0}
+                    <button class="btn-action btn-view" on:click={() => openAssignmentsModal(teacher)}>
+                      <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
+                        <circle cx="12" cy="12" r="3"/>
+                      </svg>
+                      View Assignments
+                    </button>
+                  {/if}
+                  <button class="btn-action btn-edit" on:click={() => openEditForm(teacher)}>
+                    <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                      <path d="M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z"/>
+                    </svg>
+                    Edit
+                  </button>
+                  <button 
+                    class="btn-action btn-delete" 
+                    on:click={() => handleDelete(teacher.id, `${teacher.first_name} ${teacher.last_name}`)}
+                    disabled={getTeacherAssignmentCount(teacher.id) > 0}
+                  >
+                    <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                      <polyline points="3 6 5 6 21 6"/>
+                      <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
+                    </svg>
+                    {getTeacherAssignmentCount(teacher.id) > 0 ? 'Has Assignments' : 'Delete'}
+                  </button>
+                </div>
+              </div>
+            {/each}
           </div>
         {/if}
       </div>
@@ -485,10 +508,15 @@
 <!-- Teacher Form Modal -->
 {#if showForm}
   <div class="modal-overlay" on:click={handleModalOverlayClick}>
-    <div class="modal-content card">
+    <div class="modal-content">
       <div class="modal-header">
         <h2>{editingTeacher ? 'Edit Teacher' : 'Create New Teacher'}</h2>
-        <button class="btn btn-close" on:click={closeForm} aria-label="Close modal">×</button>
+        <button class="btn-close" on:click={closeForm}>
+          <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <line x1="18" y1="6" x2="6" y2="18"/>
+            <line x1="6" y1="6" x2="18" y2="18"/>
+          </svg>
+        </button>
       </div>
       
       <form on:submit|preventDefault={handleSubmit}>
@@ -501,9 +529,7 @@
               bind:value={formData.first_name}
               placeholder="John"
               required={!editingTeacher}
-              autocomplete="given-name"
             />
-            <div class="field-note">Enter teacher's first name</div>
           </div>
           
           <div class="form-group">
@@ -514,14 +540,12 @@
               bind:value={formData.last_name}
               placeholder="Banda"
               required={!editingTeacher}
-              autocomplete="family-name"
             />
-            <div class="field-note">Enter teacher's last name</div>
           </div>
         </div>
         
         <div class="form-group">
-          <label for="email">Email *</label>
+          <label for="email">Email Address *</label>
           <input
             type="email"
             id="email"
@@ -529,12 +553,9 @@
             placeholder="teacher@school.com"
             required={!editingTeacher}
             disabled={editingTeacher}
-            autocomplete="email"
           />
           {#if editingTeacher}
-            <div class="field-note">Email cannot be changed</div>
-          {:else}
-            <div class="field-note">Teacher will use this to login</div>
+            <span class="field-hint">Email cannot be changed</span>
           {/if}
         </div>
         
@@ -545,9 +566,7 @@
             id="phone"
             bind:value={formData.phone}
             placeholder="+265888123456"
-            autocomplete="tel"
           />
-          <div class="field-note">Optional phone number</div>
         </div>
         
         {#if !editingTeacher}
@@ -557,20 +576,18 @@
               type="password"
               id="password"
               bind:value={formData.password}
-              placeholder="Enter password"
+              placeholder="Minimum 6 characters"
               required
-              autocomplete="new-password"
             />
-            <div class="field-note">Minimum 6 characters</div>
           </div>
         {/if}
         
-        <div class="modal-actions">
-          <button type="submit" class="btn btn-primary btn-submit">
-            {editingTeacher ? 'Update Teacher' : 'Create Teacher'}
-          </button>
-          <button type="button" class="btn btn-secondary" on:click={closeForm}>
+        <div class="form-actions">
+          <button type="button" class="btn-secondary" on:click={closeForm}>
             Cancel
+          </button>
+          <button type="submit" class="btn-primary">
+            {editingTeacher ? 'Update Teacher' : 'Create Teacher'}
           </button>
         </div>
       </form>
@@ -581,86 +598,66 @@
 <!-- Assignments Modal -->
 {#if showAssignmentsModal && selectedTeacher}
   <div class="modal-overlay" on:click={handleAssignmentsModalOverlayClick}>
-    <div class="modal-content card">
+    <div class="modal-content">
       <div class="modal-header">
         <h2>{selectedTeacher.first_name}'s Assignments</h2>
-        <button class="btn btn-close" on:click={closeAssignmentsModal} aria-label="Close modal">×</button>
+        <button class="btn-close" on:click={closeAssignmentsModal}>
+          <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <line x1="18" y1="6" x2="6" y2="18"/>
+            <line x1="6" y1="6" x2="18" y2="18"/>
+          </svg>
+        </button>
       </div>
       
-      <div class="teacher-info-modal">
-        <div class="info-row">
-          <span class="info-label">Teacher:</span>
-          <span class="info-value">{selectedTeacher.first_name} {selectedTeacher.last_name}</span>
+      <div class="teacher-summary">
+        <div class="summary-item">
+          <span class="summary-label">Teacher:</span>
+          <span class="summary-value">{selectedTeacher.first_name} {selectedTeacher.last_name}</span>
         </div>
-        <div class="info-row">
-          <span class="info-label">Email:</span>
-          <span class="info-value">{selectedTeacher.email}</span>
+        <div class="summary-item">
+          <span class="summary-label">Email:</span>
+          <span class="summary-value">{selectedTeacher.email}</span>
         </div>
-        <div class="info-row">
-          <span class="info-label">Total Assignments:</span>
-          <span class="info-value">{teacherAssignments.length}</span>
+        <div class="summary-item">
+          <span class="summary-label">Total Assignments:</span>
+          <span class="summary-value">{teacherAssignments.length}</span>
         </div>
       </div>
       
       {#if teacherAssignments.length === 0}
         <div class="empty-assignments">
-          <div class="empty-icon">📝</div>
+          <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/>
+            <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/>
+          </svg>
           <p>This teacher has no assignments yet.</p>
         </div>
       {:else}
-        <!-- Mobile Assignments View -->
-        <div class="mobile-assignments-view">
+        <div class="assignments-list">
           {#each teacherAssignments as assignment (assignment.id)}
-            <div class="assignment-card">
-              <div class="assignment-header">
-                <span class="assignment-id">Assignment #{assignment.id}</span>
+            <div class="assignment-item">
+              <div class="assignment-icon">
+                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/>
+                  <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/>
+                </svg>
               </div>
-              <div class="assignment-body">
-                <h4 class="subject-name">{assignment.subject_name}</h4>
-                <div class="assignment-details">
-                  <div class="detail">
-                    <span class="detail-label">Class:</span>
-                    <span class="detail-value">{assignment.class_name}</span>
-                  </div>
-                  <div class="detail">
-                    <span class="detail-label">Term:</span>
-                    <span class="detail-value">{assignment.term_name}</span>
-                  </div>
+              <div class="assignment-details">
+                <h4>{assignment.subject_name}</h4>
+                <div class="assignment-meta">
+                  <span>Class: {assignment.class_name}</span>
+                  <span>•</span>
+                  <span>Term: {assignment.term_name}</span>
                 </div>
               </div>
+              <div class="assignment-id">#{assignment.id}</div>
             </div>
           {/each}
-        </div>
-        
-        <!-- Desktop Assignments Table -->
-        <div class="desktop-assignments-table">
-          <div class="table-container">
-            <table class="assignments-table">
-              <thead>
-                <tr>
-                  <th>Assignment ID</th>
-                  <th>Subject</th>
-                  <th>Class</th>
-                  <th>Term</th>
-                </tr>
-              </thead>
-              <tbody>
-                {#each teacherAssignments as assignment (assignment.id)}
-                  <tr>
-                    <td>#{assignment.id}</td>
-                    <td><strong>{assignment.subject_name}</strong></td>
-                    <td>{assignment.class_name}</td>
-                    <td>{assignment.term_name}</td>
-                  </tr>
-                {/each}
-              </tbody>
-            </table>
-          </div>
         </div>
       {/if}
       
       <div class="modal-footer">
-        <button class="btn btn-secondary" on:click={closeAssignmentsModal}>
+        <button class="btn-secondary" on:click={closeAssignmentsModal}>
           Close
         </button>
       </div>
@@ -669,450 +666,468 @@
 {/if}
 
 <style>
-  /* Base responsive styles */
-  :global(*) {
+  * {
     box-sizing: border-box;
     margin: 0;
     padding: 0;
   }
-  
+
   .page-container {
     min-height: 100vh;
-    background: #f8f9fa;
+    background: #f8fafc;
   }
-  
-  .container {
-    width: 100%;
-    max-width: 1200px;
-    margin: 0 auto;
-    padding: 16px;
-  }
-  
+
   /* Header */
-  .header {
+  .page-header {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    padding: 2rem;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  }
+
+  .header-content {
+    max-width: 1400px;
+    margin: 0 auto;
     display: flex;
-    flex-direction: column;
-    gap: 16px;
-    margin-bottom: 24px;
-  }
-  
-  .header-left h1 {
-    font-size: 1.8rem;
-    color: #2c3e50;
-    margin: 0 0 12px 0;
-  }
-  
-  .header-stats {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
-    gap: 12px;
-  }
-  
-  .stat-card {
-    background: white;
-    padding: 16px;
-    border-radius: 8px;
-    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-    text-align: center;
-  }
-  
-  .stat-number {
-    font-size: 1.8rem;
-    font-weight: 700;
-    color: #e67e22;
-    line-height: 1;
-  }
-  
-  .stat-label {
-    font-size: 0.875rem;
-    color: #666;
-    margin-top: 4px;
-  }
-  
-  .header-actions {
-    display: flex;
-    justify-content: flex-end;
-  }
-  
-  .btn {
-    padding: 12px 20px;
-    border: none;
-    border-radius: 8px;
-    font-size: 1rem;
-    font-weight: 500;
-    cursor: pointer;
-    display: inline-flex;
+    justify-content: space-between;
     align-items: center;
-    gap: 8px;
-    min-height: 44px;
+    gap: 2rem;
   }
-  
-  .btn-primary {
-    background: #e67e22;
-    color: white;
-  }
-  
-  .btn-primary:hover {
-    background: #d35400;
-  }
-  
-  .btn-secondary {
-    background: #6c757d;
-    color: white;
-  }
-  
-  .btn-info {
-    background: #3498db;
-    color: white;
-  }
-  
-  .btn-danger {
-    background: #dc3545;
-    color: white;
-  }
-  
-  .btn-danger:disabled {
-    background: #f5c6cb;
-    color: #721c24;
-    cursor: not-allowed;
-  }
-  
-  .btn-sm {
-    padding: 8px 16px;
-    font-size: 0.875rem;
-  }
-  
-  .btn-block {
-    width: 100%;
-    justify-content: center;
-  }
-  
-  .btn-icon {
-    font-size: 1.1rem;
-  }
-  
-  /* Alerts */
-  .alert {
-    padding: 14px 16px;
-    border-radius: 8px;
-    margin-bottom: 16px;
-    display: flex;
-    align-items: flex-start;
-    gap: 10px;
-  }
-  
-  .alert-success {
-    background-color: #d4edda;
-    border: 1px solid #c3e6cb;
-    color: #155724;
-  }
-  
-  .alert-error {
-    background-color: #f8d7da;
-    border: 1px solid #f5c6cb;
-    color: #721c24;
-  }
-  
-  .alert-icon {
-    font-weight: bold;
-    font-size: 1.1rem;
-  }
-  
-  .alert-content {
+
+  .header-title-section {
     flex: 1;
   }
-  
-  /* Search and Filter */
-  .filter-card {
-    margin-bottom: 20px;
+
+  .page-title {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    font-size: 2rem;
+    font-weight: 700;
+    color: white;
+    margin-bottom: 0.5rem;
   }
-  
-  .search-container {
+
+  .page-subtitle {
+    color: rgba(255, 255, 255, 0.9);
+    font-size: 1rem;
+  }
+
+  /* Container */
+  .container {
+    max-width: 1400px;
+    margin: 0 auto;
+    padding: 2rem;
+  }
+
+  /* Stats Grid */
+  .stats-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+    gap: 1.5rem;
+    margin-bottom: 2rem;
+  }
+
+  .stat-card {
+    background: white;
+    border-radius: 16px;
+    padding: 1.5rem;
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+    transition: transform 0.3s, box-shadow 0.3s;
+  }
+
+  .stat-card:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  }
+
+  .stat-icon {
+    width: 60px;
+    height: 60px;
+    border-radius: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .stat-primary .stat-icon {
+    background: #dbeafe;
+    color: #3b82f6;
+  }
+
+  .stat-success .stat-icon {
+    background: #d1fae5;
+    color: #10b981;
+  }
+
+  .stat-info .stat-icon {
+    background: #e0e7ff;
+    color: #667eea;
+  }
+
+  .stat-content {
+    flex: 1;
+  }
+
+  .stat-value {
+    font-size: 2rem;
+    font-weight: 700;
+    color: #1e293b;
+    line-height: 1;
+    margin-bottom: 0.25rem;
+  }
+
+  .stat-label {
+    font-size: 0.875rem;
+    color: #64748b;
+  }
+
+  /* Alerts */
+  .alert {
+    padding: 1rem 1.25rem;
+    border-radius: 12px;
+    margin-bottom: 1.5rem;
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    animation: slideIn 0.3s ease-out;
+  }
+
+  @keyframes slideIn {
+    from {
+      opacity: 0;
+      transform: translateY(-10px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  .alert-success {
+    background: #d1fae5;
+    color: #065f46;
+    border: 1px solid #10b981;
+  }
+
+  .alert-error {
+    background: #fee2e2;
+    color: #991b1b;
+    border: 1px solid #ef4444;
+  }
+
+  /* Search */
+  .search-card {
+    background: white;
+    border-radius: 16px;
+    padding: 1.5rem;
+    margin-bottom: 2rem;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+  }
+
+  .search-wrapper {
     position: relative;
     display: flex;
     align-items: center;
   }
-  
+
   .search-icon {
     position: absolute;
-    left: 16px;
-    color: #666;
+    left: 1rem;
+    color: #94a3b8;
   }
-  
+
   .search-input {
     width: 100%;
-    padding: 14px 16px 14px 48px;
-    border: 2px solid #e0e0e0;
-    border-radius: 8px;
+    padding: 14px 3rem 14px 3rem;
+    border: 2px solid #e2e8f0;
+    border-radius: 12px;
     font-size: 1rem;
-    transition: border-color 0.2s;
-    min-height: 44px;
+    transition: all 0.3s;
   }
-  
+
   .search-input:focus {
     outline: none;
-    border-color: #e67e22;
-    box-shadow: 0 0 0 3px rgba(230, 126, 34, 0.2);
+    border-color: #667eea;
+    box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
   }
-  
-  .btn-clear-search {
+
+  .clear-btn {
     position: absolute;
-    right: 12px;
+    right: 1rem;
     background: none;
     border: none;
-    font-size: 1.5rem;
-    color: #666;
+    color: #94a3b8;
     cursor: pointer;
-    padding: 0;
-    width: 30px;
-    height: 30px;
+    padding: 0.5rem;
     display: flex;
     align-items: center;
     justify-content: center;
     border-radius: 50%;
-  }
-  
-  /* Cards */
-  .card {
-    background: white;
-    border-radius: 12px;
-    padding: 24px;
-    box-shadow: 0 2px 8px rgba(0,0,0,0.08);
-    margin-bottom: 20px;
-  }
-  
-  .card-title {
-    font-size: 1.2rem;
-    color: #2c3e50;
-    margin: 0 0 20px 0;
-  }
-  
-  /* Teacher Cards (Mobile) */
-  .mobile-cards-view {
-    display: grid;
-    grid-template-columns: 1fr;
-    gap: 16px;
-  }
-  
-  .teacher-card {
-    background: white;
-    border-radius: 12px;
-    padding: 20px;
-    box-shadow: 0 2px 8px rgba(0,0,0,0.08);
-    border: 2px solid transparent;
-    border-left: 4px solid #e67e22;
     transition: all 0.2s;
   }
-  
+
+  .clear-btn:hover {
+    background: #f1f5f9;
+    color: #667eea;
+  }
+
+  /* Content Card */
+  .content-card {
+    background: white;
+    border-radius: 16px;
+    padding: 2rem;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+  }
+
+  .card-header {
+    margin-bottom: 2rem;
+  }
+
+  .card-title {
+    font-size: 1.5rem;
+    font-weight: 700;
+    color: #1e293b;
+  }
+
+  /* Teachers Grid */
+  .teachers-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+    gap: 1.5rem;
+  }
+
+  .teacher-card {
+    background: white;
+    border: 2px solid #e2e8f0;
+    border-radius: 16px;
+    padding: 1.5rem;
+    transition: all 0.3s;
+  }
+
   .teacher-card:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 4px 12px rgba(0,0,0,0.12);
+    border-color: #667eea;
+    box-shadow: 0 4px 12px rgba(102, 126, 234, 0.15);
+    transform: translateY(-4px);
   }
-  
-  .teacher-card-header {
+
+  .teacher-avatar {
+    width: 64px;
+    height: 64px;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    border-radius: 50%;
     display: flex;
-    justify-content: space-between;
     align-items: center;
-    margin-bottom: 12px;
-    padding-bottom: 12px;
-    border-bottom: 1px solid #f0f0f0;
+    justify-content: center;
+    color: white;
+    margin-bottom: 1rem;
   }
-  
-  .teacher-id {
-    font-size: 0.875rem;
-    color: #666;
-    font-weight: 500;
+
+  .teacher-info {
+    margin-bottom: 1.5rem;
   }
-  
-  .teacher-assignments {
-    background: #e8f4fc;
-    color: #2980b9;
-    padding: 4px 12px;
-    border-radius: 20px;
-    font-size: 0.875rem;
-    font-weight: 500;
-  }
-  
-  .teacher-card-body {
-    margin-bottom: 16px;
-  }
-  
+
   .teacher-name {
     font-size: 1.25rem;
-    font-weight: 600;
-    color: #2c3e50;
-    margin-bottom: 12px;
+    font-weight: 700;
+    color: #1e293b;
+    margin-bottom: 1rem;
   }
-  
-  .teacher-info {
+
+  .teacher-details {
     display: flex;
     flex-direction: column;
-    gap: 8px;
-    margin-bottom: 12px;
+    gap: 0.5rem;
   }
-  
-  .info-item {
-    display: flex;
-    justify-content: space-between;
-    font-size: 0.9rem;
-  }
-  
-  .info-label {
-    color: #666;
-    font-weight: 500;
-  }
-  
-  .info-value {
-    color: #333;
-    text-align: right;
-  }
-  
-  .teacher-meta {
-    display: flex;
-    flex-direction: column;
-    gap: 8px;
-  }
-  
-  .meta-item {
+
+  .detail-row {
     display: flex;
     align-items: center;
-    gap: 8px;
+    gap: 0.5rem;
     font-size: 0.875rem;
-    color: #666;
+    color: #64748b;
   }
-  
-  .meta-icon {
-    font-size: 1rem;
+
+  .detail-row svg {
+    flex-shrink: 0;
+    color: #94a3b8;
   }
-  
-  .teacher-card-actions {
-    display: grid;
-    grid-template-columns: 1fr;
-    gap: 10px;
-  }
-  
-  /* Desktop Table View */
-  .desktop-table-view {
-    display: none;
-  }
-  
-  .table-container {
-    width: 100%;
-    overflow-x: auto;
-  }
-  
-  .teachers-table {
-    width: 100%;
-    border-collapse: collapse;
-    background: white;
-    border-radius: 8px;
-    overflow: hidden;
-  }
-  
-  .teachers-table th {
-    background: #f8f9fa;
-    padding: 16px;
-    text-align: left;
+
+  .assignments-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    background: #dbeafe;
+    color: #3b82f6;
+    padding: 0.5rem 1rem;
+    border-radius: 20px;
+    font-size: 0.875rem;
     font-weight: 600;
-    color: #2c3e50;
-    border-bottom: 2px solid #e9ecef;
-    font-size: 0.9rem;
-    white-space: nowrap;
+    margin-top: 1rem;
   }
-  
-  .teachers-table td {
-    padding: 16px;
-    border-bottom: 1px solid #e9ecef;
-    vertical-align: middle;
-  }
-  
-  .teachers-table tr:last-child td {
-    border-bottom: none;
-  }
-  
-  .teachers-table tr:hover {
-    background-color: #f8f9fa;
-  }
-  
-  .teacher-name-cell {
-    color: #2c3e50;
-  }
-  
-  .phone-badge {
-    background: #e8f4fc;
-    color: #2980b9;
-    padding: 4px 10px;
-    border-radius: 12px;
-    font-size: 0.875rem;
-    font-weight: 500;
-    display: inline-block;
-  }
-  
-  .text-muted {
-    color: #999;
-  }
-  
-  .action-buttons {
+
+  /* Teacher Actions */
+  .teacher-actions {
     display: flex;
-    gap: 8px;
+    flex-direction: column;
+    gap: 0.75rem;
   }
-  
-  /* Empty Search Results */
-  .empty-search-results {
+
+  .btn-action {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    padding: 10px 16px;
+    border: none;
+    border-radius: 8px;
+    font-size: 0.875rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.3s;
+  }
+
+  .btn-view {
+    background: #dbeafe;
+    color: #3b82f6;
+  }
+
+  .btn-view:hover {
+    background: #3b82f6;
+    color: white;
+  }
+
+  .btn-edit {
+    background: #f3f4f6;
+    color: #4b5563;
+  }
+
+  .btn-edit:hover {
+    background: #6b7280;
+    color: white;
+  }
+
+  .btn-delete {
+    background: #fee2e2;
+    color: #dc2626;
+  }
+
+  .btn-delete:hover:not(:disabled) {
+    background: #dc2626;
+    color: white;
+  }
+
+  .btn-delete:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+
+  /* Buttons */
+  .btn-primary {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 12px 24px;
+    background: white;
+    color: #667eea;
+    border: 2px solid white;
+    border-radius: 12px;
+    font-size: 1rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.3s;
+  }
+
+  .btn-primary:hover {
+    background: rgba(255, 255, 255, 0.9);
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+  }
+
+  .btn-secondary {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 12px 24px;
+    background: #f1f5f9;
+    color: #475569;
+    border: none;
+    border-radius: 12px;
+    font-size: 1rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.3s;
+  }
+
+  .btn-secondary:hover {
+    background: #e2e8f0;
+  }
+
+  /* Loading */
+  .loading-card {
+    background: white;
+    border-radius: 16px;
+    padding: 4rem 2rem;
     text-align: center;
-    padding: 30px 20px;
-    border-top: 1px solid #e9ecef;
-    margin-top: 20px;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
   }
-  
-  .empty-search-results p {
-    color: #666;
-    margin-bottom: 16px;
-  }
-  
-  /* Loading State */
-  .loading-container {
-    padding: 40px 20px;
-    text-align: center;
-  }
-  
+
   .spinner {
-    width: 40px;
-    height: 40px;
-    border: 3px solid #f3f3f3;
-    border-top: 3px solid #e67e22;
+    width: 48px;
+    height: 48px;
+    border: 4px solid #e2e8f0;
+    border-top-color: #667eea;
     border-radius: 50%;
     animation: spin 1s linear infinite;
-    margin: 0 auto 16px;
+    margin: 0 auto 1rem;
   }
-  
+
   @keyframes spin {
-    0% { transform: rotate(0deg); }
-    100% { transform: rotate(360deg); }
+    to { transform: rotate(360deg); }
   }
-  
-  /* Empty State */
+
+  /* Empty States */
   .empty-state {
-    padding: 48px 24px;
+    background: white;
+    border-radius: 16px;
+    padding: 4rem 2rem;
+    text-align: center;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+  }
+
+  .empty-icon {
+    margin-bottom: 1.5rem;
+    color: #cbd5e1;
+  }
+
+  .empty-state h3 {
+    font-size: 1.5rem;
+    color: #1e293b;
+    margin-bottom: 0.5rem;
+  }
+
+  .empty-state p {
+    color: #64748b;
+    margin-bottom: 2rem;
+  }
+
+  .no-results {
+    padding: 3rem 2rem;
     text-align: center;
   }
-  
-  .empty-icon {
-    font-size: 48px;
-    margin-bottom: 16px;
+
+  .no-results svg {
+    color: #cbd5e1;
+    margin-bottom: 1rem;
   }
-  
-  .empty-state h3 {
-    color: #2c3e50;
-    margin-bottom: 8px;
-    font-size: 1.3rem;
+
+  .no-results p {
+    color: #64748b;
+    margin-bottom: 1.5rem;
   }
-  
-  .empty-state p {
-    color: #666;
-    margin-bottom: 24px;
-  }
-  
+
   /* Modal */
   .modal-overlay {
     position: fixed;
@@ -1125,19 +1140,23 @@
     justify-content: center;
     align-items: center;
     z-index: 1000;
-    padding: 16px;
+    padding: 1rem;
     backdrop-filter: blur(4px);
   }
-  
+
   .modal-content {
+    background: white;
+    border-radius: 16px;
+    padding: 2rem;
     width: 100%;
     max-width: 600px;
     max-height: 90vh;
     overflow-y: auto;
-    animation: modalSlideIn 0.3s ease-out;
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+    animation: modalSlide 0.3s ease-out;
   }
-  
-  @keyframes modalSlideIn {
+
+  @keyframes modalSlide {
     from {
       opacity: 0;
       transform: translateY(-20px);
@@ -1147,361 +1166,275 @@
       transform: translateY(0);
     }
   }
-  
+
   .modal-header {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    margin-bottom: 20px;
-    padding-bottom: 16px;
-    border-bottom: 1px solid #eee;
+    margin-bottom: 2rem;
+    padding-bottom: 1rem;
+    border-bottom: 2px solid #e2e8f0;
   }
-  
+
   .modal-header h2 {
     font-size: 1.5rem;
-    color: #2c3e50;
-    margin: 0;
+    font-weight: 700;
+    color: #1e293b;
   }
-  
+
   .btn-close {
     background: none;
     border: none;
-    font-size: 28px;
-    color: #666;
+    color: #94a3b8;
     cursor: pointer;
-    padding: 0;
-    width: 36px;
-    height: 36px;
+    padding: 0.5rem;
     display: flex;
     align-items: center;
     justify-content: center;
     border-radius: 50%;
+    transition: all 0.2s;
   }
-  
-  /* Teacher Info Modal */
-  .teacher-info-modal {
-    background: #f8f9fa;
-    border-radius: 8px;
-    padding: 16px;
-    margin-bottom: 20px;
+
+  .btn-close:hover {
+    background: #f1f5f9;
+    color: #667eea;
   }
-  
-  .info-row {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin-bottom: 10px;
-  }
-  
-  .info-row:last-child {
-    margin-bottom: 0;
-  }
-  
-  .info-label {
-    font-weight: 500;
-    color: #666;
-  }
-  
-  .info-value {
-    font-weight: 600;
-    color: #2c3e50;
-  }
-  
-  /* Assignments Modal */
-  .empty-assignments {
-    text-align: center;
-    padding: 40px 20px;
-  }
-  
-  .empty-assignments .empty-icon {
-    font-size: 36px;
-    margin-bottom: 12px;
-  }
-  
-  .empty-assignments p {
-    color: #666;
-  }
-  
-  .mobile-assignments-view {
-    display: grid;
-    grid-template-columns: 1fr;
-    gap: 12px;
-    max-height: 400px;
-    overflow-y: auto;
-    margin-bottom: 20px;
-  }
-  
-  .assignment-card {
-    background: #f8f9fa;
-    border-radius: 8px;
-    padding: 16px;
-    border-left: 4px solid #3498db;
-  }
-  
-  .assignment-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin-bottom: 12px;
-  }
-  
-  .assignment-id {
-    font-size: 0.875rem;
-    color: #666;
-  }
-  
-  .assignment-body {
-    margin-bottom: 12px;
-  }
-  
-  .subject-name {
-    font-size: 1.1rem;
-    font-weight: 600;
-    color: #2c3e50;
-    margin-bottom: 8px;
-  }
-  
-  .assignment-details {
-    display: flex;
-    flex-direction: column;
-    gap: 6px;
-  }
-  
-  .detail {
-    display: flex;
-    justify-content: space-between;
-  }
-  
-  .detail-label {
-    font-size: 0.875rem;
-    color: #666;
-  }
-  
-  .detail-value {
-    font-size: 0.875rem;
-    color: #333;
-    font-weight: 500;
-  }
-  
-  .desktop-assignments-table {
-    display: none;
-  }
-  
-  .assignments-table {
-    width: 100%;
-    border-collapse: collapse;
-    background: white;
-    border-radius: 8px;
-    overflow: hidden;
-  }
-  
-  .assignments-table th {
-    background: #f8f9fa;
-    padding: 12px 16px;
-    text-align: left;
-    font-weight: 600;
-    color: #2c3e50;
-    border-bottom: 2px solid #e9ecef;
-    font-size: 0.9rem;
-  }
-  
-  .assignments-table td {
-    padding: 12px 16px;
-    border-bottom: 1px solid #e9ecef;
-    vertical-align: middle;
-  }
-  
-  .assignments-table tr:last-child td {
-    border-bottom: none;
-  }
-  
-  .modal-footer {
-    margin-top: 20px;
-    text-align: right;
-  }
-  
+
   /* Form */
   .form-grid {
     display: grid;
-    grid-template-columns: 1fr;
-    gap: 16px;
-    margin-bottom: 16px;
+    grid-template-columns: 1fr 1fr;
+    gap: 1rem;
   }
-  
+
   .form-group {
-    margin-bottom: 16px;
+    margin-bottom: 1.5rem;
   }
-  
-  label {
+
+  .form-group label {
     display: block;
-    margin-bottom: 8px;
-    font-weight: 500;
-    color: #2c3e50;
-    font-size: 0.95rem;
+    margin-bottom: 0.5rem;
+    font-weight: 600;
+    color: #1e293b;
+    font-size: 0.875rem;
   }
-  
-  input[type="text"],
-  input[type="email"],
-  input[type="tel"],
-  input[type="password"] {
+
+  .form-group input {
     width: 100%;
-    padding: 14px 16px;
-    border: 2px solid #e0e0e0;
+    padding: 12px 16px;
+    border: 2px solid #e2e8f0;
     border-radius: 8px;
     font-size: 1rem;
-    transition: border-color 0.2s;
-    min-height: 44px;
+    transition: all 0.3s;
   }
-  
-  input:focus {
+
+  .form-group input:focus {
     outline: none;
-    border-color: #e67e22;
-    box-shadow: 0 0 0 3px rgba(230, 126, 34, 0.2);
+    border-color: #667eea;
+    box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
   }
-  
-  input:disabled {
-    background: #f5f5f5;
+
+  .form-group input:disabled {
+    background: #f1f5f9;
     cursor: not-allowed;
   }
-  
-  .field-note {
+
+  .field-hint {
+    display: block;
+    margin-top: 0.5rem;
     font-size: 0.875rem;
-    color: #666;
-    margin-top: 6px;
+    color: #64748b;
   }
-  
-  .modal-actions {
+
+  .form-actions {
+    display: flex;
+    gap: 1rem;
+    margin-top: 2rem;
+  }
+
+  .form-actions .btn-primary {
+    flex: 2;
+    justify-content: center;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    border: none;
+  }
+
+  .form-actions .btn-primary:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+  }
+
+  .form-actions .btn-secondary {
+    flex: 1;
+    justify-content: center;
+  }
+
+  /* Teacher Summary */
+  .teacher-summary {
+    background: #f8fafc;
+    border-radius: 12px;
+    padding: 1.5rem;
+    margin-bottom: 2rem;
+  }
+
+  .summary-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 0.75rem;
+  }
+
+  .summary-item:last-child {
+    margin-bottom: 0;
+  }
+
+  .summary-label {
+    font-weight: 600;
+    color: #64748b;
+  }
+
+  .summary-value {
+    font-weight: 600;
+    color: #1e293b;
+  }
+
+  /* Assignments List */
+  .assignments-list {
     display: flex;
     flex-direction: column;
-    gap: 12px;
-    margin-top: 32px;
+    gap: 1rem;
+    max-height: 400px;
+    overflow-y: auto;
+    margin-bottom: 2rem;
   }
-  
-  .btn-submit {
-    padding: 14px 20px;
-    font-weight: 600;
+
+  .assignment-item {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    background: #f8fafc;
+    border-radius: 12px;
+    padding: 1rem;
+    transition: all 0.2s;
+  }
+
+  .assignment-item:hover {
+    background: #f1f5f9;
+  }
+
+  .assignment-icon {
+    width: 48px;
+    height: 48px;
+    background: #dbeafe;
+    color: #3b82f6;
+    border-radius: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+  }
+
+  .assignment-details {
+    flex: 1;
+  }
+
+  .assignment-details h4 {
     font-size: 1rem;
+    font-weight: 600;
+    color: #1e293b;
+    margin-bottom: 0.25rem;
   }
-  
-  /* Media Queries */
-  @media (min-width: 768px) {
-    .container {
-      padding: 24px;
+
+  .assignment-meta {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-size: 0.875rem;
+    color: #64748b;
+  }
+
+  .assignment-id {
+    font-size: 0.875rem;
+    color: #94a3b8;
+    font-weight: 600;
+  }
+
+  .empty-assignments {
+    text-align: center;
+    padding: 3rem 2rem;
+  }
+
+  .empty-assignments svg {
+    color: #cbd5e1;
+    margin-bottom: 1rem;
+  }
+
+  .empty-assignments p {
+    color: #64748b;
+  }
+
+  .modal-footer {
+    margin-top: 2rem;
+    text-align: right;
+  }
+
+  /* Responsive */
+  @media (max-width: 768px) {
+    .page-header {
+      padding: 1.5rem 1rem;
     }
-    
-    .header {
-      flex-direction: row;
-      justify-content: space-between;
+
+    .header-content {
+      flex-direction: column;
       align-items: flex-start;
     }
-    
-    .header-left {
-      flex: 1;
-    }
-    
-    .header-stats {
-      grid-template-columns: repeat(3, 140px);
-      gap: 16px;
-    }
-    
-    .stat-number {
-      font-size: 2rem;
-    }
-    
-    .form-grid {
-      grid-template-columns: 1fr 1fr;
-    }
-    
-    .modal-actions {
-      flex-direction: row;
-    }
-    
-    .btn-submit {
-      flex: 2;
-    }
-    
-    .mobile-cards-view {
-      display: none;
-    }
-    
-    .desktop-table-view {
-      display: block;
-    }
-    
-    .mobile-assignments-view {
-      display: none;
-    }
-    
-    .desktop-assignments-table {
-      display: block;
-    }
-  }
-  
-  @media (min-width: 1024px) {
-    .container {
-      padding: 32px;
-    }
-    
-    .header-left h1 {
-      font-size: 2rem;
-    }
-    
-    .modal-content {
-      max-width: 700px;
-    }
-  }
-  
-  @media (max-width: 480px) {
-    .container {
-      padding: 12px;
-    }
-    
-    .header-left h1 {
-      font-size: 1.4rem;
-    }
-    
-    .stat-card {
-      padding: 12px;
-    }
-    
-    .stat-number {
+
+    .page-title {
       font-size: 1.5rem;
     }
-    
-    .teacher-card {
-      padding: 16px;
+
+    .container {
+      padding: 1rem;
     }
-    
-    .teacher-name {
-      font-size: 1.1rem;
-    }
-    
-    .teacher-card-actions {
+
+    .stats-grid {
       grid-template-columns: 1fr;
     }
-    
+
+    .teachers-grid {
+      grid-template-columns: 1fr;
+    }
+
+    .form-grid {
+      grid-template-columns: 1fr;
+    }
+
+    .form-actions {
+      flex-direction: column;
+    }
+
+    .form-actions .btn-primary,
+    .form-actions .btn-secondary {
+      flex: 1;
+    }
+  }
+
+  @media (max-width: 480px) {
+    .page-title {
+      font-size: 1.25rem;
+    }
+
+    .page-subtitle {
+      font-size: 0.875rem;
+    }
+
+    .stat-value {
+      font-size: 1.5rem;
+    }
+
     .modal-content {
-      padding: 20px;
+      padding: 1.5rem;
     }
-    
-    .modal-header h2 {
-      font-size: 1.3rem;
-    }
-    
-    input {
-      padding: 12px 14px;
-    }
-  }
-  
-  /* Touch improvements */
-  button, 
-  input {
-    min-height: 44px; /* Minimum touch target */
-  }
-  
-  button {
-    cursor: pointer;
-    user-select: none;
-    -webkit-tap-highlight-color: transparent;
   }
 </style>
